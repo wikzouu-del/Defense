@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kingdom's Last Stand 🏰⚔️</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+h1 {
+  font-size: 2rem;
+  margin: 12px 0 4px;
+  color: #ffd700;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+#top-bar {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 8px 16px;
+  background: #16213e;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#top-bar .stat {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+#top-bar .stat span { color: #ffd700; }
+#game-wrap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+canvas {
+  border: 2px solid #0f3460;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #2a2a3e;
+}
+#side-panel {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 12px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#side-panel h3 {
+  color: #ffd700;
+  margin-bottom: 4px;
+  font-size: 1rem;
+  text-align: center;
+}
+.build-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 2px solid #0f3460;
+  border-radius: 6px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+.build-btn:hover { border-color: #ffd700; background: #222244; }
+.build-btn.selected { border-color: #ffd700; background: #2a2a5e; box-shadow: 0 0 8px rgba(255,215,0,0.3); }
+.build-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+.build-btn .icon { font-size: 1.4rem; }
+.build-btn .info { display: flex; flex-direction: column; }
+.build-btn .name { font-weight: 700; }
+.build-btn .cost { font-size: 0.75rem; color: #aaa; }
+#action-btn {
+  margin-top: 8px;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#action-btn.build-phase { background: #e94560; color: #fff; }
+#action-btn.build-phase:hover { background: #ff6b6b; }
+#action-btn.raid-phase { background: #444; color: #999; cursor: default; }
+#wave-info {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-top: 4px;
+}
+#msg-box {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.92);
+  border: 3px solid #ffd700;
+  border-radius: 16px;
+  padding: 40px 48px;
+  text-align: center;
+  z-index: 100;
+  display: none;
+}
+#msg-box h2 { font-size: 2rem; color: #ffd700; margin-bottom: 12px; }
+#msg-box p { font-size: 1.1rem; margin-bottom: 20px; }
+#msg-box button {
+  padding: 10px 32px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #e94560;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+#msg-box button:hover { background: #ff6b6b; }
+#tooltip {
+  position: fixed;
+  background: #16213e;
+  border: 1px solid #ffd700;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  pointer-events: none;
+  display: none;
+  z-index: 50;
+  max-width: 200px;
+}
+</style>
+</head>
+<body>
+
+<h1>🏰 Kingdom's Last Stand ⚔️</h1>
+
+<div id="top-bar">
+  <div class="stat">🪵 Bois: <span id="s-wood">200</span></div>
+  <div class="stat">🪨 Pierre: <span id="s-stone">150</span></div>
+  <div class="stat">🏰 Château: <span id="s-hp">100</span>%</div>
+  <div class="stat">⚔️ Vague: <span id="s-wave">1</span></div>
+  <div class="stat">⏱️ <span id="s-phase">Construction</span>: <span id="s-timer">25</span>s</div>
+</div>
+
+<div id="game-wrap">
+  <canvas id="game" width="720" height="720"></canvas>
+  <div id="side-panel">
+    <h3>🔨 Bâtiments</h3>
+    <div id="build-buttons"></div>
+    <button id="action-btn" class="build-phase">⚔️ Lancer le Raid !</button>
+    <div id="wave-info">Placez vos défenses !</div>
+  </div>
+</div>
+
+<div id="msg-box">
+  <h2 id="msg-title"></h2>
+  <p id="msg-text"></p>
+  <button id="msg-btn" onclick="restartGame()">Rejouer</button>
+</div>
+
+<div id="tooltip" id="tooltip"></div>
+
+<script>
+// ── Constants ──
+const GRID = 18, CELL = 40, SIZE = GRID * CELL;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const BUILDINGS = {
+  wall:     { name: 'Mur',          icon: '🧱', wood: 30,  stone: 20, hp: 200, desc: 'Bloque les ennemis' },
+  archer:   { name: 'Tour Archer',  icon: '🗼', wood: 60,  stone: 40, hp: 120, range: 5, dmg: 15, rate: 60, desc: 'Tire sur les ennemis à portée' },
+  catapult: { name: 'Catapulte',    icon: '🪖', wood: 80,  stone: 60, hp: 100, range: 7, dmg: 40, splash: 1.5, rate: 120, desc: 'Dégâts en zone' },
+  barracks: { name: 'Caserne',      icon: '🏠', wood: 70,  stone: 50, hp: 150, spawnRate: 300, desc: 'Génère des soldats' },
+  farm:     { name: 'Ferme',        icon: '🌾', wood: 40,  stone: 10, hp: 80, prodRate: 180, prodType: 'wood', prodAmt: 15, desc: '+15 bois / intervalle' },
+  mine:     { name: 'Mine',         icon: '⛏️', wood: 10,  stone: 40, hp: 80, prodRate: 180, prodType: 'stone', prodAmt: 12, desc: '+12 pierre / intervalle' },
+};
+
+const ENEMY_TYPES = {
+  goblin: { name: 'Gobelin', icon: '👺', hp: 60, speed: 1.2, dmg: 8, reward: { wood: 5, stone: 3 } },
+  ogre:   { name: 'Ogre',    icon: '👹', hp: 200, speed: 0.6, dmg: 25, reward: { wood: 10, stone: 8 } },
+};
+
+// ── Game State ──
+let wood, stone, castleHP, castleMaxHP, wave, phase, timer, tick;
+let grid, buildings, enemies, soldiers, projectiles, particles, floatingTexts;
+let selectedBuilding, castlePos;
+
+function initGame() {
+  wood = 200; stone = 150;
+  castleMaxHP = 500; castleHP = castleMaxHP;
+  wave = 1; phase = 'build'; timer = 25; tick = 0;
+  grid = Array.from({ length: GRID }, () => Array(GRID).fill(null));
+  buildings = []; enemies = []; soldiers = []; projectiles = []; particles = []; floatingTexts = [];
+  selectedBuilding = null;
+
+  // Place castle at center
+  castlePos = { x: Math.floor(GRID / 2) - 1, y: Math.floor(GRID / 2) - 1 };
+  for (let dy = 0; dy < 3; dy++)
+    for (let dx = 0; dx < 3; dx++)
+      grid[castlePos.y + dy][castlePos.x + dx] = 'castle';
+
+  updateUI();
+  buildBuildButtons();
+}
+
+// ── UI ──
+function updateUI() {
+  document.getElementById('s-wood').textContent = wood;
+  document.getElementById('s-stone').textContent = stone;
+  document.getElementById('s-hp').textContent = Math.max(0, Math.round(castleHP / castleMaxHP * 100));
+  document.getElementById('s-wave').textContent = wave;
+  document.getElementById('s-phase').textContent = phase === 'build' ? 'Construction' : 'Raid';
+  document.getElementById('s-timer').textContent = Math.ceil(timer);
+
+  const btn = document.getElementById('action-btn');
+  if (phase === 'build') {
+    btn.className = 'build-phase';
+    btn.textContent = '⚔️ Lancer le Raid !';
+  } else {
+    btn.className = 'raid-phase';
+    btn.textContent = '🛡️ Raid en cours...';
+  }
+  updateBuildButtons();
+}
+
+function buildBuildButtons() {
+  const container = document.getElementById('build-buttons');
+  container.innerHTML = '';
+  for (const [key, b] of Object.entries(BUILDINGS)) {
+    const btn = document.createElement('button');
+    btn.className = 'build-btn';
+    btn.dataset.type = key;
+    btn.innerHTML = `<span class="icon">${b.icon}</span><div class="info"><span class="name">${b.name}</span><span class="cost">🪵${b.wood} 🪨${b.stone}</span></div>`;
+    btn.addEventListener('click', () => selectBuilding(key));
+    btn.addEventListener('mouseenter', (e) => showTooltip(e, b));
+    btn.addEventListener('mouseleave', hideTooltip);
+    container.appendChild(btn);
+  }
+}
+
+function updateBuildButtons() {
+  document.querySelectorAll('.build-btn').forEach(btn => {
+    const b = BUILDINGS[btn.dataset.type];
+    const canAfford = wood >= b.wood && stone >= b.stone;
+    btn.classList.toggle('disabled', !canAfford || phase !== 'build');
+    btn.classList.toggle('selected', btn.dataset.type === selectedBuilding);
+  });
+}
+
+function selectBuilding(type) {
+  if (phase !== 'build') return;
+  const b = BUILDINGS[type];
+  if (wood < b.wood || stone < b.stone) return;
+  selectedBuilding = selectedBuilding === type ? null : type;
+  updateBuildButtons();
+}
+
+function showTooltip(e, b) {
+  const tt = document.getElementById('tooltip');
+  tt.innerHTML = `<b>${b.icon} ${b.name}</b><br>${b.desc}<br>❤️ ${b.hp} PV`;
+  tt.style.left = (e.clientX + 12) + 'px';
+  tt.style.top = (e.clientY + 12) + 'px';
+  tt.style.display = 'block';
+}
+function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+function showMessage(title, text) {
+  document.getElementById('msg-title').textContent = title;
+  document.getElementById('msg-text').textContent = text;
+  document.getElementById('msg-box').style.display = 'block';
+}
+
+// ── Canvas interaction ──
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - rect.left) / CELL);
+  const gy = Math.floor((e.clientY - rect.top) / CELL);
+  if (gx < 0 || gx >= GRID || gy < 0 || gy >= GRID) return;
+
+  if (phase === 'build' && selectedBuilding) {
+    placeBuilding(gx, gy, selectedBuilding);
+  }
+});
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - rect.left) / CELL);
+  const gy = Math.floor((e.clientY - rect.top) / CELL);
+  if (phase === 'build' && grid[gy] && grid[gy][gx] && grid[gy][gx] !== 'castle') {
+    removeBuilding(gx, gy);
+  }
+});
+
+document.getElementById('action-btn').addEventListener('click', () => {
+  if (phase === 'build') startRaid();
+});
+
+// ── Building placement ──
+function placeBuilding(gx, gy, type) {
+  if (grid[gy][gx] !== null) return;
+  const b = BUILDINGS[type];
+  if (wood < b.wood || stone < b.stone) return;
+  wood -= b.wood;
+  stone -= b.stone;
+  const building = { type, x: gx, y: gy, hp: b.hp, maxHp: b.hp, cooldown: 0 };
+  grid[gy][gx] = building;
+  buildings.push(building);
+  addFloatingText(gx * CELL + CELL/2, gy * CELL, b.icon, '#ffd700');
+  updateUI();
+}
+
+function removeBuilding(gx, gy) {
+  const b = grid[gy][gx];
+  if (!b || b === 'castle') return;
+  const def = BUILDINGS[b.type];
+  wood += Math.floor(def.wood * 0.5);
+  stone += Math.floor(def.stone * 0.5);
+  grid[gy][gx] = null;
+  buildings.splice(buildings.indexOf(b), 1);
+  addFloatingText(gx * CELL + CELL/2, gy * CELL, '♻️', '#4caf50');
+  updateUI();
+}
+
+// ── Raid / Wave ──
+function startRaid() {
+  phase = 'raid';
+  timer = 0;
+  spawnWave();
+  updateUI();
+}
+
+function spawnWave() {
+  const count = 5 + wave * 3;
+  const ogreChance = Math.min(0.1 + wave * 0.05, 0.5);
+
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      if (phase !== 'raid') return;
+      const type = Math.random() < ogreChance ? 'ogre' : 'goblin';
+      const def = ENEMY_TYPES[type];
+      const hpMult = 1 + (wave - 1) * 0.25;
+      const side = Math.floor(Math.random() * 4);
+      let ex, ey;
+      if (side === 0)      { ex = Math.random() * SIZE; ey = -20; }
+      else if (side === 1)  { ex = SIZE + 20; ey = Math.random() * SIZE; }
+      else if (side === 2)  { ex = Math.random() * SIZE; ey = SIZE + 20; }
+      else                  { ex = -20; ey = Math.random() * SIZE; }
+
+      enemies.push({
+        type, x: ex, y: ey,
+        hp: Math.round(def.hp * hpMult),
+        maxHp: Math.round(def.hp * hpMult),
+        speed: def.speed,
+        dmg: def.dmg,
+        targetX: 0, targetY: 0,
+        attackCooldown: 0,
+        reward: def.reward,
+      });
+    }, i * (600 - Math.min(wave * 30, 400)));
+  }
+}
+
+function endWave() {
+  phase = 'build';
+  timer = 25;
+  wave++;
+  // Bonus resources
+  const bonus = 20 + wave * 10;
+  wood += bonus;
+  stone += Math.floor(bonus * 0.7);
+  addFloatingText(SIZE / 2, SIZE / 2 - 40, `Vague ${wave - 1} terminée !`, '#4caf50');
+  addFloatingText(SIZE / 2, SIZE / 2, `+${bonus}🪵 +${Math.floor(bonus*0.7)}🪨`, '#ffd700');
+  document.getElementById('wave-info').textContent = `Vague ${wave} — Préparez-vous !`;
+  updateUI();
+}
+
+// ── Game loop ──
+function update() {
+  tick++;
+
+  // Timer
+  if (phase === 'build') {
+    timer -= 1 / 60;
+    if (timer <= 0) startRaid();
+  }
+
+  // Check raid end
+  if (phase === 'raid' && enemies.length === 0 && tick > 60) {
+    endWave();
+  }
+
+  const castleCX = (castlePos.x + 1.5) * CELL;
+  const castleCY = (castlePos.y + 1.5) * CELL;
+
+  // ── Update buildings ──
+  for (const b of buildings) {
+    b.cooldown = Math.max(0, b.cooldown - 1);
+    const def = BUILDINGS[b.type];
+    const bcx = b.x * CELL + CELL / 2;
+    const bcy = b.y * CELL + CELL / 2;
+
+    if (b.type === 'archer' && b.cooldown <= 0 && phase === 'raid') {
+      const target = findClosestEnemy(bcx, bcy, def.range * CELL);
+      if (target) {
+        projectiles.push({ x: bcx, y: bcy, tx: target.x, ty: target.y, target, dmg: def.dmg, speed: 6, type: 'arrow' });
+        b.cooldown = def.rate;
+      }
+    }
+
+    if (b.type === 'catapult' && b.cooldown <= 0 && phase === 'raid') {
+      const target = findClosestEnemy(bcx, bcy, def.range * CELL);
+      if (target) {
+        projectiles.push({ x: bcx, y: bcy, tx: target.x, ty: target.y, target, dmg: def.dmg, splash: def.splash * CELL, speed: 3.5, type: 'rock' });
+        b.cooldown = def.rate;
+      }
+    }
+
+    if (b.type === 'barracks' && b.cooldown <= 0 && phase === 'raid' && soldiers.length < 30) {
+      soldiers.push({ x: bcx, y: bcy, hp: 50, maxHp: 50, dmg: 12, speed: 1.5, target: null, attackCooldown: 0 });
+      b.cooldown = def.spawnRate;
+    }
+
+    if ((b.type === 'farm' || b.type === 'mine') && b.cooldown <= 0) {
+      if (def.prodType === 'wood') wood += def.prodAmt;
+      else stone += def.prodAmt;
+      b.cooldown = def.prodRate;
+      addFloatingText(bcx, bcy - 10, `+${def.prodAmt}${def.prodType === 'wood' ? '🪵' : '🪨'}`, '#4caf50');
+    }
+  }
+
+  // ── Update enemies ──
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    e.attackCooldown = Math.max(0, e.attackCooldown - 1);
+
+    // Find target: nearest building or castle
+    let targetX = castleCX, targetY = castleCY;
+    let minDist = dist(e.x, e.y, castleCX, castleCY);
+    let targetBuilding = null;
+
+    for (const b of buildings) {
+      const d = dist(e.x, e.y, b.x * CELL + CELL/2, b.y * CELL + CELL/2);
+      if (d < minDist && b.type === 'wall') {
+        minDist = d;
+        targetX = b.x * CELL + CELL / 2;
+        targetY = b.y * CELL + CELL / 2;
+        targetBuilding = b;
+      }
+    }
+
+    // Check if blocked by a building
+    const nextGX = Math.floor(e.x / CELL);
+    const nextGY = Math.floor(e.y / CELL);
+    let blocked = false;
+    if (nextGX >= 0 && nextGX < GRID && nextGY >= 0 && nextGY < GRID) {
+      const cell = grid[nextGY][nextGX];
+      if (cell && cell !== 'castle' && cell.type === 'wall') {
+        targetBuilding = cell;
+        blocked = true;
+      }
+    }
+
+    if (blocked && targetBuilding && e.attackCooldown <= 0) {
+      targetBuilding.hp -= e.dmg;
+      e.attackCooldown = 40;
+      addFloatingText(e.x, e.y - 15, `-${e.dmg}`, '#ff4444');
+      if (targetBuilding.hp <= 0) {
+        destroyBuilding(targetBuilding);
+      }
+    } else if (!blocked) {
+      // Move toward target
+      const angle = Math.atan2(targetY - e.y, targetX - e.x);
+      e.x += Math.cos(angle) * e.speed;
+      e.y += Math.sin(angle) * e.speed;
+    }
+
+    // Attack castle
+    if (dist(e.x, e.y, castleCX, castleCY) < CELL * 2 && e.attackCooldown <= 0) {
+      castleHP -= e.dmg;
+      e.attackCooldown = 50;
+      addFloatingText(castleCX, castleCY - 20, `-${e.dmg}`, '#ff0000');
+      spawnParticles(castleCX, castleCY, '#ff4444', 5);
+      if (castleHP <= 0) {
+        showMessage('💀 Défaite !', `Votre royaume est tombé à la vague ${wave}...`);
+        phase = 'over';
+      }
+    }
+
+    // Dead
+    if (e.hp <= 0) {
+      wood += e.reward.wood;
+      stone += e.reward.stone;
+      addFloatingText(e.x, e.y - 10, `+${e.reward.wood}🪵+${e.reward.stone}🪨`, '#ffd700');
+      spawnParticles(e.x, e.y, '#9b59b6', 8);
+      enemies.splice(i, 1);
+    }
+  }
+
+  // ── Update soldiers ──
+  for (let i = soldiers.length - 1; i >= 0; i--) {
+    const s = soldiers[i];
+    s.attackCooldown = Math.max(0, s.attackCooldown - 1);
+
+    // Find closest enemy
+    let closest = null, closestD = Infinity;
+    for (const e of enemies) {
+      const d = dist(s.x, s.y, e.x, e.y);
+      if (d < closestD) { closestD = d; closest = e; }
+    }
+
+    if (closest && closestD < CELL * 1.2) {
+      // Attack
+      if (s.attackCooldown <= 0) {
+        closest.hp -= s.dmg;
+        s.attackCooldown = 30;
+        spawnParticles((s.x + closest.x) / 2, (s.y + closest.y) / 2, '#fff', 3);
+      }
+    } else if (closest) {
+      const angle = Math.atan2(closest.y - s.y, closest.x - s.x);
+      s.x += Math.cos(angle) * s.speed;
+      s.y += Math.sin(angle) * s.speed;
+    } else {
+      // Return near castle
+      const angle = Math.atan2(castleCY - s.y, castleCX - s.x);
+      if (dist(s.x, s.y, castleCX, castleCY) > CELL * 3) {
+        s.x += Math.cos(angle) * s.speed * 0.5;
+        s.y += Math.sin(angle) * s.speed * 0.5;
+      }
+    }
+
+    // Soldiers take damage from nearby enemies
+    for (const e of enemies) {
+      if (dist(s.x, s.y, e.x, e.y) < CELL && e.attackCooldown <= 0) {
+        s.hp -= e.dmg * 0.3;
+      }
+    }
+
+    if (s.hp <= 0) {
+      spawnParticles(s.x, s.y, '#3498db', 6);
+      soldiers.splice(i, 1);
+    }
+  }
+
+  // ── Update projectiles ──
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    const angle = Math.atan2(p.ty - p.y, p.tx - p.x);
+    p.x += Math.cos(angle) * p.speed;
+    p.y += Math.sin(angle) * p.speed;
+
+    if (dist(p.x, p.y, p.tx, p.ty) < 8) {
+      if (p.splash) {
+        // Splash damage
+        for (const e of enemies) {
+          if (dist(e.x, e.y, p.x, p.y) < p.splash) {
+            e.hp -= p.dmg;
+            addFloatingText(e.x, e.y - 10, `-${p.dmg}`, '#ff8800');
+          }
+        }
+        spawnParticles(p.x, p.y, '#ff6600', 12);
+      } else {
+        if (p.target && p.target.hp > 0) {
+          p.target.hp -= p.dmg;
+          addFloatingText(p.target.x, p.target.y - 10, `-${p.dmg}`, '#ffaa00');
+        }
+        spawnParticles(p.x, p.y, '#ffd700', 4);
+      }
+      projectiles.splice(i, 1);
+    }
+  }
+
+  // ── Update particles ──
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // ── Update floating texts ──
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y -= 0.8;
+    ft.life--;
+    if (ft.life <= 0) floatingTexts.splice(i, 1);
+  }
+
+  updateUI();
+}
+
+function destroyBuilding(b) {
+  spawnParticles(b.x * CELL + CELL/2, b.y * CELL + CELL/2, '#8b4513', 15);
+  addFloatingText(b.x * CELL + CELL/2, b.y * CELL, '💥', '#ff0000');
+  grid[b.y][b.x] = null;
+  const idx = buildings.indexOf(b);
+  if (idx >= 0) buildings.splice(idx, 1);
+}
+
+// ── Rendering ──
+function draw() {
+  ctx.clearRect(0, 0, SIZE, SIZE);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= GRID; i++) {
+    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, SIZE); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(SIZE, i * CELL); ctx.stroke();
+  }
+
+  // Hover highlight
+  if (phase === 'build' && selectedBuilding && mouseGX >= 0 && mouseGX < GRID && mouseGY >= 0 && mouseGY < GRID) {
+    const canPlace = grid[mouseGY][mouseGX] === null;
+    ctx.fillStyle = canPlace ? 'rgba(0,255,0,0.15)' : 'rgba(255,0,0,0.15)';
+    ctx.fillRect(mouseGX * CELL, mouseGY * CELL, CELL, CELL);
+    if (selectedBuilding === 'archer' || selectedBuilding === 'catapult') {
+      const range = BUILDINGS[selectedBuilding].range * CELL;
+      ctx.beginPath();
+      ctx.arc(mouseGX * CELL + CELL/2, mouseGY * CELL + CELL/2, range, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,215,0,0.2)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Castle
+  const cx = castlePos.x * CELL, cy = castlePos.y * CELL;
+  const castleGrad = ctx.createRadialGradient(cx + CELL*1.5, cy + CELL*1.5, 10, cx + CELL*1.5, cy + CELL*1.5, CELL*2);
+  castleGrad.addColorStop(0, '#ffd700');
+  castleGrad.addColorStop(1, 'rgba(255,215,0,0)');
+  ctx.fillStyle = castleGrad;
+  ctx.fillRect(cx - CELL, cy - CELL, CELL * 5, CELL * 5);
+
+  ctx.font = `${CELL * 2.2}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🏰', cx + CELL * 1.5, cy + CELL * 1.5);
+
+  // HP bar for castle
+  drawHPBar(cx + CELL * 1.5, cy + CELL * 3.2, CELL * 3, castleHP, castleMaxHP);
+
+  // Buildings
+  for (const b of buildings) {
+    const def = BUILDINGS[b.type];
+    ctx.font = `${CELL * 0.8}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.icon, b.x * CELL + CELL / 2, b.y * CELL + CELL / 2);
+    drawHPBar(b.x * CELL + CELL / 2, b.y * CELL + CELL - 2, CELL - 4, b.hp, b.maxHp);
+
+    // Range indicator for active towers during raid
+    if (phase === 'raid' && (b.type === 'archer' || b.type === 'catapult')) {
+      ctx.beginPath();
+      ctx.arc(b.x * CELL + CELL/2, b.y * CELL + CELL/2, def.range * CELL, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,215,0,0.08)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Enemies
+  for (const e of enemies) {
+    const def = ENEMY_TYPES[e.type];
+    const sz = e.type === 'ogre' ? CELL * 0.9 : CELL * 0.7;
+    ctx.font = `${sz}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.icon, e.x, e.y);
+    drawHPBar(e.x, e.y - sz / 2 - 4, CELL * 0.7, e.hp, e.maxHp);
+  }
+
+  // Soldiers
+  for (const s of soldiers) {
+    ctx.font = `${CELL * 0.55}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚔️', s.x, s.y);
+    drawHPBar(s.x, s.y - 14, CELL * 0.5, s.hp, s.maxHp);
+  }
+
+  // Projectiles
+  for (const p of projectiles) {
+    if (p.type === 'arrow') {
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#8b4513';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Floating texts
+  for (const ft of floatingTexts) {
+    ctx.globalAlpha = ft.life / ft.maxLife;
+    ctx.fillStyle = ft.color;
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(ft.text, ft.x, ft.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHPBar(x, y, w, hp, maxHp) {
+  const ratio = Math.max(0, hp / maxHp);
+  const h = 4;
+  ctx.fillStyle = '#333';
+  ctx.fillRect(x - w / 2, y, w, h);
+  ctx.fillStyle = ratio > 0.5 ? '#4caf50' : ratio > 0.25 ? '#ff9800' : '#f44336';
+  ctx.fillRect(x - w / 2, y, w * ratio, h);
+}
+
+// ── Helpers ──
+function dist(x1, y1, x2, y2) {
+  return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+}
+
+function findClosestEnemy(x, y, range) {
+  let closest = null, closestD = range;
+  for (const e of enemies) {
+    const d = dist(x, y, e.x, e.y);
+    if (d < closestD) { closestD = d; closest = e; }
+  }
+  return closest;
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 2;
+    const life = 20 + Math.random() * 20;
+    particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, color, size: 2 + Math.random() * 3, life, maxLife: life });
+  }
+}
+
+function addFloatingText(x, y, text, color) {
+  floatingTexts.push({ x, y, text, color, life: 60, maxLife: 60 });
+}
+
+// ── Mouse tracking ──
+let mouseGX = -1, mouseGY = -1;
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseGX = Math.floor((e.clientX - rect.left) / CELL);
+  mouseGY = Math.floor((e.clientY - rect.top) / CELL);
+});
+canvas.addEventListener('mouseleave', () => { mouseGX = -1; mouseGY = -1; });
+
+// ── Main loop ──
+function gameLoop() {
+  if (phase !== 'over') {
+    update();
+    draw();
+  } else {
+    draw();
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+function restartGame() {
+  document.getElementById('msg-box').style.display = 'none';
+  initGame();
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', (e) => {
+  const keys = ['1', '2', '3', '4', '5', '6'];
+  const types = Object.keys(BUILDINGS);
+  const idx = keys.indexOf(e.key);
+  if (idx >= 0 && idx < types.length) {
+    selectBuilding(types[idx]);
+  }
+  if (e.key === 'Escape') {
+    selectedBuilding = null;
+    updateBuildButtons();
+  }
+  if (e.key === ' ' && phase === 'build') {
+    e.preventDefault();
+    startRaid();
+  }
+});
+
+// ── Start ──
+initGame();
+gameLoop();
+</script>
+</body>
+</html>
