@@ -508,7 +508,7 @@ body{font-family:var(--f);display:flex;flex-direction:column;user-select:none}
     </div>
   </div>
   <div class="gb-btn" id="gb-dem" onclick="toggleDemolish()" title="Démolir">💥</div>
-  <div class="gb-btn" id="gb-shop" onclick="openShopPanel()" title="Shop"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f0c040" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div>
+
   <div class="gb-btn" id="gb-upg" onclick="openUpgPanel()" title="Améliorer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f0c040" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></div>
   <div class="gb-btn" onclick="openMenuPanel()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f0c040" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></div>
 </div>
@@ -765,6 +765,8 @@ function doAuth() {
     if (users[user].pass !== pass) { err.textContent = t('err_pass_wrong'); return; }
   }
   currentUser = { name: user, data: users[user] };
+  // Sauvegarder la session pour la prochaine ouverture
+  try { localStorage.setItem('kls_session', JSON.stringify({name:user, pass:pass})); } catch(e) {}
   enterGame();
 }
 
@@ -1880,8 +1882,23 @@ window.addEventListener('load', function() {
     splash.style.opacity = '0';
     setTimeout(function() {
       splash.style.display = 'none';
-      document.getElementById('login').style.display = 'flex';
-      updateLoginUI();
+      // Tenter auto-login depuis session sauvegardée
+      var autoLogin = false;
+      try {
+        var sess = JSON.parse(localStorage.getItem('kls_session') || 'null');
+        if (sess && sess.name && sess.pass) {
+          var usrs = JSON.parse(localStorage.getItem('kls_users') || '{}');
+          if (usrs[sess.name] && usrs[sess.name].pass === sess.pass) {
+            currentUser = { name: sess.name, data: usrs[sess.name] };
+            autoLogin = true;
+            enterGame();
+          }
+        }
+      } catch(_e) {}
+      if (!autoLogin) {
+        document.getElementById('login').style.display = 'flex';
+        updateLoginUI();
+      }
     }, 650);
   }, 1800);
 });
@@ -3288,57 +3305,35 @@ function drawGame() {
     ctx.globalAlpha = 1;
   }
 
-  // ── Projectiles ──
+  // ── Projectiles — tailles divisées par camZoom ──
   for (var pi = 0; pi < projectiles.length; pi++) {
     var p = projectiles[pi];
     var pIx = ix(p.x / TILE, p.y / TILE);
-    var pIy = iy(p.x / TILE, p.y / TILE) - TH * 0.5;
-    var isArrow = !p.type || p.type === 'arrow';
-    var isIce = p.type === 'ice';
-    var isPoison = p.type === 'poison';
-    var isMagic = p.type === 'magic';
-    var isCata = p.type === 'catapult';
+    var pIy = iy(p.x / TILE, p.y / TILE) - TH * 0.3;
+    // Tailles fixes à l'écran (divisées par camZoom car on est dans la transform)
+    var pZ = camZoom;
+    var r1 = 3 / pZ, r2 = 5 / pZ, r3 = 8 / pZ, rH = 14 / pZ;
 
-    if (isCata) {
-      // Boulet de catapulte — gros rocher
-      var grad = ctx.createRadialGradient(pIx-2, pIy-2, 1, pIx, pIy, 9);
-      grad.addColorStop(0, '#999'); grad.addColorStop(1, '#444');
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(pIx, pIy, 8, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
-      ctx.stroke();
-    } else if (isArrow) {
-      // Flèche rapide avec lueur
-      var glow = ctx.createRadialGradient(pIx, pIy, 0, pIx, pIy, 12);
-      glow.addColorStop(0, 'rgba(255,220,60,0.6)'); glow.addColorStop(1, 'rgba(255,140,0,0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(pIx, pIy, 12, 0, Math.PI*2); ctx.fill();
+    if (p.type === 'catapult') {
+      ctx.fillStyle = '#888'; ctx.beginPath(); ctx.arc(pIx, pIy, r2, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5/pZ; ctx.stroke();
+    } else if (p.type === 'ice') {
+      ctx.fillStyle = 'rgba(120,210,255,0.85)';
+      ctx.beginPath(); ctx.arc(pIx, pIy, r2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#e0f8ff'; ctx.beginPath(); ctx.arc(pIx, pIy, r1, 0, Math.PI*2); ctx.fill();
+    } else if (p.type === 'poison') {
+      ctx.fillStyle = 'rgba(80,220,60,0.9)';
+      ctx.beginPath(); ctx.arc(pIx, pIy, r2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ccff88'; ctx.beginPath(); ctx.arc(pIx, pIy, r1, 0, Math.PI*2); ctx.fill();
+    } else if (p.type === 'magic') {
+      ctx.fillStyle = 'rgba(200,80,255,0.9)';
+      ctx.beginPath(); ctx.arc(pIx, pIy, r2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffbbff'; ctx.beginPath(); ctx.arc(pIx, pIy, r1, 0, Math.PI*2); ctx.fill();
+    } else {
+      // Flèche/défaut — petit point doré
       ctx.fillStyle = '#ffdd44';
-      ctx.beginPath(); ctx.arc(pIx, pIy, 4, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(pIx-1, pIy-1, 1.5, 0, Math.PI*2); ctx.fill();
-    } else if (isIce) {
-      var glow2 = ctx.createRadialGradient(pIx, pIy, 0, pIx, pIy, 10);
-      glow2.addColorStop(0, 'rgba(150,230,255,0.8)'); glow2.addColorStop(1, 'rgba(80,180,255,0)');
-      ctx.fillStyle = glow2; ctx.beginPath(); ctx.arc(pIx, pIy, 10, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#bbedff'; ctx.beginPath(); ctx.arc(pIx, pIy, 5, 0, Math.PI*2); ctx.fill();
-    } else if (isPoison) {
-      var glow3 = ctx.createRadialGradient(pIx, pIy, 0, pIx, pIy, 10);
-      glow3.addColorStop(0, 'rgba(100,255,80,0.8)'); glow3.addColorStop(1, 'rgba(50,200,0,0)');
-      ctx.fillStyle = glow3; ctx.beginPath(); ctx.arc(pIx, pIy, 10, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#88ff44'; ctx.beginPath(); ctx.arc(pIx, pIy, 5, 0, Math.PI*2); ctx.fill();
-    } else if (isMagic) {
-      var glow4 = ctx.createRadialGradient(pIx, pIy, 0, pIx, pIy, 13);
-      glow4.addColorStop(0, 'rgba(230,100,255,0.9)'); glow4.addColorStop(1, 'rgba(150,0,255,0)');
-      ctx.fillStyle = glow4; ctx.beginPath(); ctx.arc(pIx, pIy, 13, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#ee88ff'; ctx.beginPath(); ctx.arc(pIx, pIy, 6, 0, Math.PI*2); ctx.fill();
-      // Étoiles tournantes
-      ctx.fillStyle = 'rgba(255,200,255,0.9)';
-      var t2 = Date.now() * 0.006;
-      for (var si=0; si<4; si++) {
-        var sa = t2 + si * Math.PI / 2;
-        ctx.beginPath(); ctx.arc(pIx + Math.cos(sa)*8, pIy + Math.sin(sa)*5, 2, 0, Math.PI*2); ctx.fill();
-      }
+      ctx.beginPath(); ctx.arc(pIx, pIy, r2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(pIx - 0.5/pZ, pIy - 0.5/pZ, r1*0.5, 0, Math.PI*2); ctx.fill();
     }
   }
 
@@ -4361,9 +4356,5 @@ document.querySelectorAll('.lb').forEach(function(b) {
 });
 
 </script>
-<div id="shop-panel">
-  <div class="shop-title">🛒 <span id="shop-title-txt">Boutique</span></div>
-  <div class="shop-grid" id="shop-grid"></div>
-</div>
 </body>
 </html>
